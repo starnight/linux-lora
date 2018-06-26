@@ -10,6 +10,10 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 
+/* particular protocols of the protocol family PF_LORA */
+#define LORA_PROTO_DATAGRAM	0
+#define LORA_NPROTO		1
+
 struct sockaddr_lora {
 	__kernel_sa_family_t lora_family;
 	int lora_ifindex;
