@@ -31,6 +31,13 @@ config LORA_SX127X
 	help
 	  Semtech SX1272/1276/1278
 
+config LORA_USI
+	tristate "USI WM-SG-SM-42 driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  USI WM-SG-SM-42
+
 config LORA_WIMOD
 	tristate "IMST WiMOD driver"
 	default y
