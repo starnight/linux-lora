@@ -57,6 +57,14 @@ config LORA_SX127X
 	help
 	  Semtech SX1272/1276/1278
 
+config LORA_SX130X
+	tristate "Semtech SX130x SPI driver"
+	default y
+	depends on SPI
+	select REGMAP_SPI
+	help
+	  Semtech SX1301/1308
+
 config LORA_USI
 	tristate "USI WM-SG-SM-42 driver"
 	default y
