@@ -1,0 +1,9 @@
+#
+# LoRa
+#
+
+menuconfig LORA
+	depends on NET
+	tristate "LoRa subsystem support"
+	help
+	  LoRa ...
