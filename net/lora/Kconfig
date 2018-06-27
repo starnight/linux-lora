@@ -7,3 +7,9 @@ menuconfig LORA
 	tristate "LoRa subsystem support"
 	help
 	  LoRa ...
+
+if LORA
+
+source "drivers/net/lora/Kconfig"
+
+endif

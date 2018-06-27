@@ -1,0 +1,18 @@
+#
+# LoRa
+#
+
+menu "LoRa Device Drivers"
+
+config LORA_DEV
+	tristate "LoRa drivers"
+	default y
+	help
+	  LoRa ...
+	  If unsure, say Y.
+
+#
+# Alphabetically sorted.
+#
+
+endmenu
