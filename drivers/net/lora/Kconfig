@@ -17,6 +17,13 @@ config LORA_DEV
 
 if LORA_DEV
 
+config LORA_RAK811
+	tristate "RAK RAK811 driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  RAK RAK811/RAK812
+
 config LORA_RN2483
 	tristate "Microchip RN2483/RN2903 driver"
 	default y

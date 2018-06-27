@@ -9,6 +9,9 @@ lora-dev-y := dev.o
 # Alphabetically sorted.
 #
 
+obj-$(CONFIG_LORA_RAK811) += lora-rak811.o
+lora-rak811-y := rak811.o
+
 obj-$(CONFIG_LORA_RN2483) += lora-rn2483.o
 lora-rn2483-y := rn2483.o
 lora-rn2483-y += rn2483_cmd.o
