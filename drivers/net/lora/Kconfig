@@ -31,6 +31,14 @@ config LORA_SX127X
 	help
 	  Semtech SX1272/1276/1278
 
+config LORA_WIMOD
+	tristate "IMST WiMOD driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	select CRC_CCITT
+	help
+	  IMST WiMOD
+
 endif
 
 endmenu
