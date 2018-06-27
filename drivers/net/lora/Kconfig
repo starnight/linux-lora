@@ -15,4 +15,15 @@ config LORA_DEV
 # Alphabetically sorted.
 #
 
+if LORA_DEV
+
+config LORA_SX127X
+	tristate "Semtech SX127x SPI driver"
+	default y
+	depends on SPI
+	help
+	  Semtech SX1272/1276/1278
+
+endif
+
 endmenu
