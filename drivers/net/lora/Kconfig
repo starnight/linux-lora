@@ -17,6 +17,13 @@ config LORA_DEV
 
 if LORA_DEV
 
+config LORA_RN2483
+	tristate "Microchip RN2483/RN2903 driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  Microchip RN2483/2903
+
 config LORA_SX127X
 	tristate "Semtech SX127x SPI driver"
 	default y
