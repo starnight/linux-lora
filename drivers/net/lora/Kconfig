@@ -31,6 +31,25 @@ config LORA_RN2483
 	help
 	  Microchip RN2483/2903
 
+config LORA_SX125X_CORE
+	tristate
+
+config LORA_SX125X
+	tristate "Semtech SX125x driver"
+	depends on SPI
+	help
+	  Semtech SX1255/1257 driver
+
+config LORA_SX125X_SPI
+	bool "Semtech SX125x SPI driver"
+	default n
+	depends on LORA_SX125X
+	depends on SPI
+	select REGMAP_SPI
+	select LORA_SX125X_CORE
+	help
+	  Semtech SX1255/1257 SPI driver
+
 config LORA_SX127X
 	tristate "Semtech SX127x SPI driver"
 	default y
