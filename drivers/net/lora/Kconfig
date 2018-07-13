@@ -75,6 +75,13 @@ config LORA_SX130X
 	help
 	  Semtech SX1301/1308
 
+config LORA_TING01M
+	tristate "Ting 01M driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  Himalaya HIMO-01M
+
 config LORA_USI
 	tristate "USI WM-SG-SM-42 driver"
 	default y
