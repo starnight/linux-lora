@@ -22,6 +22,8 @@ void close_loradev(struct net_device *dev);
 struct lora_dev_priv {
 	u32 magic;
 	struct net_device *dev;
+
+	u32 (*get_freq)(struct net_device *netdev);
 };
 
 #endif /* _LORA_DEV_H */
