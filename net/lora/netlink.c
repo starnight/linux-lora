@@ -3,31 +3,13 @@
  * Copyright (c) 2018 Andreas Färber
  */
 
+#include <linux/if_arp.h>
+#include <linux/lora.h>
 #include <linux/module.h>
+#include <linux/nllora.h>
+#include <linux/lora/dev.h>
 #include <net/genetlink.h>
-
-// nllora.h
-#define NLLORA_GENL_NAME "nllora"
-
-enum nllora_attrs {
-	NLLORA_ATTR_UNSPEC = 0,
-
-	NLLORA_ATTR_FOO,
-
-	__NLLORA_ATTR_AFTER_LAST,
-	NLLORA_ATTR_MAX = __NLLORA_ATTR_AFTER_LAST - 1,
-};
-
-enum nllora_commands {
-	NLLORA_CMD_UNSPEC = 0,
-
-	NLLORA_CMD_FOO,
-
-	__NLLORA_CMD_AFTER_LAST,
-	NLLORA_CMD_MAX = __NLLORA_CMD_AFTER_LAST - 1,
-};
-
-// end nllora.h
+#include <net/sock.h>
 
 enum nllora_multicast_groups {
 	NLLORA_MCGRP_CONFIG = 0,
@@ -37,21 +19,67 @@ static const struct genl_multicast_group nllora_mcgrps[] = {
 	[NLLORA_MCGRP_CONFIG] = { .name = "config" },
 };
 
-static int nllora_cmd_foo(struct sk_buff *skb, struct genl_info *info)
+static struct genl_family nllora_fam;
+
+static int nllora_cmd_get_freq(struct sk_buff *skb, struct genl_info *info)
 {
-	return 0;
+	struct nlattr **attrs = genl_family_attrbuf(&nllora_fam);
+	bool have_ifindex = attrs[NLLORA_ATTR_IFINDEX];
+	struct sk_buff *msg;
+	struct net_device *netdev;
+	struct lora_dev_priv *priv;
+	void *hdr;
+	int ifindex = -1;
+
+	if (have_ifindex)
+		ifindex = nla_get_u32(attrs[NLLORA_ATTR_IFINDEX]);
+
+	netdev = dev_get_by_index(sock_net(skb->sk), ifindex);
+	if (!netdev)
+		return -ENOBUFS;
+
+	priv = netdev_priv(netdev);
+	if (netdev->type != ARPHRD_LORA || priv->magic != LORA_DEV_MAGIC) {
+		dev_put(netdev);
+		return -ENOBUFS;
+	}
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg) {
+		dev_put(netdev);
+		return -ENOMEM;
+	}
+
+	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq, &nllora_fam, 0, NLLORA_CMD_GET_FREQ);
+	nla_put_u32(msg, NLLORA_ATTR_IFINDEX, ifindex);
+
+	if (!priv->get_freq) {
+		dev_put(netdev);
+		genlmsg_cancel(msg, hdr);
+		nlmsg_free(msg);
+		return -ENOBUFS;
+	}
+
+	nla_put_u32(msg, NLLORA_ATTR_FREQ, priv->get_freq(netdev));
+
+	dev_put(netdev);
+
+	genlmsg_end(msg, hdr);
+
+	return genlmsg_reply(msg, info);
 }
 
 static const struct nla_policy nllora_policy[NLLORA_ATTR_MAX + 1] = {
-	[NLLORA_ATTR_FOO] = { .type = NLA_U32 },
+	[NLLORA_ATTR_IFINDEX] = { .type = NLA_U32 },
+	[NLLORA_ATTR_FREQ] = { .type = NLA_U32 },
 };
 
 static const struct genl_ops nllora_ops[] = {
 	{
-		.cmd = NLLORA_CMD_FOO,
-		.doit = nllora_cmd_foo,
+		.cmd = NLLORA_CMD_GET_FREQ,
+		.doit = nllora_cmd_get_freq,
 		.policy = nllora_policy,
-		.flags = GENL_ADMIN_PERM,
+		.flags = 0/*GENL_ADMIN_PERM*/,
 		.internal_flags = 0,
 	},
 };
