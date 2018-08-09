@@ -36,7 +36,7 @@ config LORA_SX125X_CORE
 
 config LORA_SX125X
 	tristate "Semtech SX125x driver"
-	depends on SPI
+	depends on SPI || LORA_SX130X
 	help
 	  Semtech SX1255/1257 driver
 
@@ -49,6 +49,16 @@ config LORA_SX125X_SPI
 	select LORA_SX125X_CORE
 	help
 	  Semtech SX1255/1257 SPI driver
+
+config LORA_SX125X_CON
+	bool "Semtech SX125x concentrator driver"
+	default y
+	depends on LORA_SX125X
+	depends on LORA_SX130X
+	select REGMAP
+	select LORA_SX125X_CORE
+	help
+	  Semtech SX1255/1257 concentrator driver
 
 config LORA_SX127X
 	tristate "Semtech SX127x SPI driver"

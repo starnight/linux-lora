@@ -18,6 +18,10 @@
 #include <linux/spi/spi.h>
 #endif
 
+#ifdef CONFIG_LORA_SX125X_CON
+#include <linux/lora/sx130x.h>
+#endif
+
 #include "sx125x.h"
 
 enum sx125x_fields {
@@ -139,6 +143,47 @@ static int __maybe_unused sx125x_regmap_remove(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_LORA_SX125X_CON
+static int sx125x_con_probe(struct sx130x_radio_device *rdev)
+{
+	struct device *dev = &rdev->dev;
+	int ret;
+
+	rdev->regmap = devm_regmap_init(dev, rdev->regmap_bus, rdev,
+			&sx125x_regmap_config);
+	if (IS_ERR(rdev->regmap)) {
+		ret = PTR_ERR(rdev->regmap);
+		dev_err(dev, "Regmap allocation failed: %d\n", ret);
+		return ret;
+	}
+
+	return sx125x_regmap_probe(dev, rdev->regmap);
+}
+
+static int sx125x_con_remove(struct sx130x_radio_device *rdev)
+{
+	return sx125x_regmap_remove(&rdev->dev);
+}
+
+#ifdef CONFIG_OF
+static const struct of_device_id sx125x_con_of_match[] = {
+	{ .compatible = "semtech,sx1255" },
+	{ .compatible = "semtech,sx1257" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, sx125x_con_of_match);
+#endif
+
+static struct sx130x_radio_driver sx125x_con_driver = {
+	.probe  = sx125x_con_probe,
+	.remove = sx125x_con_remove,
+	.driver = {
+		.name = "sx125x_con",
+		.of_match_table = of_match_ptr(sx125x_con_of_match),
+	},
+};
+#endif
+
 #ifdef CONFIG_LORA_SX125X_SPI
 static int sx125x_spi_probe(struct spi_device *spi)
 {
@@ -199,6 +244,13 @@ static int __init sx125x_init(void)
 		return ret;
 	}
 #endif
+#ifdef CONFIG_LORA_SX125X_CON
+	ret = sx130x_register_radio_driver(&sx125x_con_driver);
+	if (ret < 0) {
+		pr_err("failed to init sx125x con (%d)\n", ret);
+		return ret;
+	}
+#endif
 
 	return ret;
 }
@@ -208,6 +260,9 @@ static void __exit sx125x_exit(void)
 {
 #ifdef CONFIG_LORA_SX125X_SPI
 	spi_unregister_driver(&sx125x_spi_driver);
+#endif
+#ifdef CONFIG_LORA_SX125X_CON
+	sx130x_unregister_radio_driver(&sx125x_con_driver);
 #endif
 }
 module_exit(sx125x_exit);
