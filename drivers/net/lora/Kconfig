@@ -17,6 +17,13 @@ config LORA_DEV
 
 if LORA_DEV
 
+config LORA_MM002
+	tristate "Nemeus MM002 driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  Nemeus MM002
+
 config LORA_RAK811
 	tristate "RAK RAK811 driver"
 	default y
