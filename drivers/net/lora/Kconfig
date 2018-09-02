@@ -31,6 +31,13 @@ config LORA_RAK811
 	help
 	  RAK RAK811/RAK812
 
+config LORA_RF1276TS
+	tristate "Appcon Wireless RF1276TS driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  Appcon Wireless RF1276TS LoRaWAN
+
 config LORA_RN2483
 	tristate "Microchip RN2483/RN2903 driver"
 	default y
