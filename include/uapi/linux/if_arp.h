@@ -100,6 +100,8 @@
 #define ARPHRD_VSOCKMON	826		/* Vsock monitor header		*/
 #define ARPHRD_LORA	827		/* LoRa				*/
 #define ARPHRD_LORAWAN	828		/* LoRaWAN			*/
+#define ARPHRD_OOK	829		/* On/Off Keying modulation	*/
+#define ARPHRD_FSK	830		/* Frequency Shift Keying modulation */
 
 #define ARPHRD_VOID	  0xFFFF	/* Void type, nothing is known */
 #define ARPHRD_NONE	  0xFFFE	/* zero header length */
