@@ -10,6 +10,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
 #include <linux/lora.h>
@@ -54,6 +55,7 @@ static const struct reg_field sx130x_regmap_fields[] = {
 struct sx130x_priv {
 	struct lora_dev_priv	lora;
 	struct device		*dev;
+	struct clk		*clk32m;
 	struct gpio_desc	*rst_gpio;
 	struct regmap		*regmap;
 	struct regmap_field	*regmap_fields[ARRAY_SIZE(sx130x_regmap_fields)];
@@ -478,17 +480,29 @@ static int sx130x_loradev_open(struct net_device *netdev)
 		return -ENXIO;
 	}
 
+	priv->clk32m = clk_get(priv->dev, "clk32m");
+	if (IS_ERR(priv->clk32m)) {
+		dev_err(priv->dev, "failed to get clk32m (%ld)\n", PTR_ERR(priv->clk32m));
+		return PTR_ERR(priv->clk32m);
+	}
+
+	ret = clk_prepare_enable(priv->clk32m);
+	if (ret) {
+		dev_err(priv->dev, "failed to enable clk32m (%d)\n", ret);
+		goto err_clk_enable;
+	}
+
 	mutex_lock(&priv->io_lock);
 
 	ret = sx130x_field_write(priv, F_GLOBAL_EN, 1);
 	if (ret) {
-		dev_err(priv->dev, "enable global clocks failed\n");
+		dev_err(priv->dev, "enable global clocks failed (%d)\n", ret);
 		goto err_reg;
 	}
 
 	ret = sx130x_field_write(priv, F_CLK32M_EN, 1);
 	if (ret) {
-		dev_err(priv->dev, "enable 32M clock failed\n");
+		dev_err(priv->dev, "enable 32M clock failed (%d)\n", ret);
 		goto err_reg;
 	}
 
@@ -519,15 +533,24 @@ err_firmware:
 err_calibrate:
 err_reg:
 	mutex_unlock(&priv->io_lock);
+	clk_disable_unprepare(priv->clk32m);
+err_clk_enable:
+	clk_put(priv->clk32m);
 	return ret;
 }
 
 static int sx130x_loradev_stop(struct net_device *netdev)
 {
+	struct sx130x_priv *priv = netdev_priv(netdev);
+
 	netdev_dbg(netdev, "%s", __func__);
 
 	netif_stop_queue(netdev);
 	close_loradev(netdev);
+
+	clk_disable_unprepare(priv->clk32m);
+	clk_put(priv->clk32m);
+	priv->clk32m = NULL;
 
 	return 0;
 }
