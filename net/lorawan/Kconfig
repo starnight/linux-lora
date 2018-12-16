@@ -1,0 +1,10 @@
+config LORAWAN
+	tristate "LoRaWAN Network support"
+	help
+	  LoRaWAN defines low data rate, low power and long range wireless
+	  wide area networks. It was designed to organize networks of automation
+	  devices, such as sensors, switches and actuators. It can operate
+	  multiple kilometers wide.
+
+	  Say Y here to compile LoRaWAN support into the kernel or say M to
+	  compile it as a module.
