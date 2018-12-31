@@ -9,6 +9,8 @@
  * Copyright (c) 2013 Semtech-Cycleo
  */
 
+#include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -41,9 +43,15 @@ static const struct reg_field sx125x_regmap_fields[] = {
 };
 
 struct sx125x_priv {
+	struct clk		*clkout;
+	struct clk_hw		clkout_hw;
+
+	struct device		*dev;
 	struct regmap		*regmap;
 	struct regmap_field     *regmap_fields[ARRAY_SIZE(sx125x_regmap_fields)];
 };
+
+#define to_clkout(_hw) container_of(_hw, struct sx125x_priv, clkout_hw)
 
 static struct regmap_config __maybe_unused sx125x_regmap_config = {
 	.reg_bits = 8,
@@ -63,6 +71,100 @@ static int sx125x_field_write(struct sx125x_priv *priv,
 	return regmap_field_write(priv->regmap_fields[field_id], val);
 }
 
+static int sx125x_field_read(struct sx125x_priv *priv,
+		enum sx125x_fields field_id, unsigned int *val)
+{
+	return regmap_field_read(priv->regmap_fields[field_id], val);
+}
+
+static int sx125x_clkout_prepare(struct clk_hw *hw)
+{
+	struct sx125x_priv *priv = to_clkout(hw);
+
+	dev_info(priv->dev, "preparing clkout\n");
+	return sx125x_field_write(priv, F_CLK_OUT, 1);
+}
+
+static void sx125x_clkout_unprepare(struct clk_hw *hw)
+{
+	struct sx125x_priv *priv = to_clkout(hw);
+	int ret;
+
+	dev_info(priv->dev, "unpreparing clkout\n");
+	ret = sx125x_field_write(priv, F_CLK_OUT, 0);
+	if (ret)
+		dev_err(priv->dev, "error unpreparing clkout\n");
+}
+
+static int sx125x_clkout_is_prepared(struct clk_hw *hw)
+{
+	struct sx125x_priv *priv = to_clkout(hw);
+	unsigned int enabled;
+	int ret;
+
+	ret = sx125x_field_read(priv, F_CLK_OUT, &enabled);
+	if (ret) {
+		dev_err(priv->dev, "error reading clk enable\n");
+		return 0;
+	}
+	return enabled;
+}
+
+static const struct clk_ops sx125x_clkout_ops = {
+	.prepare = sx125x_clkout_prepare,
+	.unprepare = sx125x_clkout_unprepare,
+	.is_prepared = sx125x_clkout_is_prepared,
+};
+
+static int sx125x_register_clock_provider(struct sx125x_priv *priv)
+{
+	struct device *dev = priv->dev;
+	struct clk_init_data init;
+	const char *parent;
+	int ret;
+
+	/* Disable CLKOUT */
+	ret = sx125x_field_write(priv, F_CLK_OUT, 0);
+	if (ret) {
+		dev_err(dev, "unable to disable clkout\n");
+		return ret;
+	}
+
+	/* Register clock provider if expected in DTB */
+	if (!of_find_property(dev->of_node, "#clock-cells", NULL))
+		return 0;
+
+	dev_info(dev, "registering clkout\n");
+
+	parent = of_clk_get_parent_name(dev->of_node, 0);
+	if (!parent) {
+		dev_err(dev, "Unable to find parent clk\n");
+		return -ENODEV;
+	}
+
+	init.ops = &sx125x_clkout_ops;
+	init.flags = CLK_IS_BASIC;
+	init.parent_names = &parent;
+	init.num_parents = 1;
+	priv->clkout_hw.init = &init;
+
+	ret = of_property_read_string_index(dev->of_node, "clock-output-names", 0,
+					    &init.name);
+	if (ret) {
+		dev_err(dev, "unable to find output name\n");
+		return ret;
+	}
+
+	priv->clkout = devm_clk_register(dev, &priv->clkout_hw);
+	if (IS_ERR(priv->clkout)) {
+		dev_err(dev, "failed to register clkout\n");
+		return PTR_ERR(priv->clkout);
+	}
+	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get,
+			&priv->clkout_hw);
+	return ret;
+}
+
 static int __maybe_unused sx125x_regmap_probe(struct device *dev, struct regmap *regmap)
 {
 	struct sx125x_priv *priv;
@@ -75,6 +177,7 @@ static int __maybe_unused sx125x_regmap_probe(struct device *dev, struct regmap 
 		return -ENOMEM;
 
 	dev_set_drvdata(dev, priv);
+	priv->dev = dev;
 	priv->regmap = regmap;
 	for (i = 0; i < ARRAY_SIZE(sx125x_regmap_fields); i++) {
 		const struct reg_field *reg_fields = sx125x_regmap_fields;
@@ -98,14 +201,10 @@ static int __maybe_unused sx125x_regmap_probe(struct device *dev, struct regmap 
 		dev_info(dev, "SX125x version: %02x\n", val);
 	}
 
-	if (false) {
-		ret = sx125x_field_write(priv, F_CLK_OUT, 1);
-		if (ret) {
-			dev_err(dev, "enabling clock output failed\n");
-			return ret;
-		}
-
-		dev_info(dev, "enabling clock output\n");
+	ret = sx125x_register_clock_provider(priv);
+	if (ret) {
+		dev_err(dev, "failed to register clkout provider: %d\n", ret);
+		return ret;
 	}
 
 	/* TODO Only needs setting on radio on the TX path */
