@@ -43,60 +43,68 @@ static int sx130x_radio_write_one(struct regmap *regmap,
 	const struct sx130x_radio_regs *regs,
 	u8 addr, u8 val)
 {
+	struct device *dev = regmap_get_device(regmap);
 	int ret;
+
+	sx130x_io_lock(dev);
 
 	ret = regmap_write(regmap, regs->cs, 0);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_raw_write(regmap, regs->addr, &addr, 1);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_raw_write(regmap, regs->data, &val, 1);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_write(regmap, regs->cs, 1);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_write(regmap, regs->cs, 0);
-	if (ret)
-		return ret;
-
-	return 0;
+out:
+	sx130x_io_unlock(dev);
+	return ret;
 }
 
 static int sx130x_radio_read_one(struct regmap *regmap,
 	const struct sx130x_radio_regs *regs,
 	u8 addr, u8 *val)
 {
+	struct device *dev = regmap_get_device(regmap);
 	int ret;
+
+	sx130x_io_lock(dev);
 
 	ret = regmap_write(regmap, regs->cs, 0);
 	if (ret)
-		return ret;
+		goto out;
 
 	/* address to tx */
 	ret = regmap_raw_write(regmap, regs->addr, &addr, 1);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_write(regmap, regs->data, 0);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_write(regmap, regs->cs, 1);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_write(regmap, regs->cs, 0);
 	if (ret)
-		return ret;
+		goto out;
 
 	/* reading */
-	return regmap_raw_read(regmap, regs->rb, val, 1);
+	ret = regmap_raw_read(regmap, regs->rb, val, 1);
+out:
+	sx130x_io_unlock(dev);
+	return ret;
 }
 
 static int sx130x_radio_gather_write(void *context,

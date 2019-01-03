@@ -79,6 +79,8 @@ enum sx130x_fields {
 };
 
 struct regmap *sx130x_get_regmap(struct device *dev);
+void sx130x_io_lock(struct device *dev);
+void sx130x_io_unlock(struct device *dev);
 
 int __init sx130x_radio_init(void);
 void __exit sx130x_radio_exit(void);

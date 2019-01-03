@@ -14,6 +14,7 @@
 #include <linux/firmware.h>
 #include <linux/lora.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/netdevice.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -56,6 +57,7 @@ struct sx130x_priv {
 	struct gpio_desc	*rst_gpio;
 	struct regmap		*regmap;
 	struct regmap_field	*regmap_fields[ARRAY_SIZE(sx130x_regmap_fields)];
+	struct mutex		io_lock;
 };
 
 struct regmap *sx130x_get_regmap(struct device *dev)
@@ -64,6 +66,22 @@ struct regmap *sx130x_get_regmap(struct device *dev)
 	struct sx130x_priv *priv = netdev_priv(netdev);
 
 	return priv->regmap;
+}
+
+void sx130x_io_lock(struct device *dev)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct sx130x_priv *priv = netdev_priv(netdev);
+
+	mutex_lock(&priv->io_lock);
+}
+
+void sx130x_io_unlock(struct device *dev)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct sx130x_priv *priv = netdev_priv(netdev);
+
+	mutex_unlock(&priv->io_lock);
 }
 
 static const struct regmap_range_cfg sx130x_regmap_ranges[] = {
@@ -120,6 +138,7 @@ static struct regmap_config sx130x_regmap_config = {
 	.val_bits = 8,
 
 	.cache_type = REGCACHE_NONE,
+	.disable_locking = true,
 
 	.read_flag_mask = 0,
 	.write_flag_mask = BIT(7),
@@ -458,37 +477,48 @@ static int sx130x_loradev_open(struct net_device *netdev)
 		return -ENXIO;
 	}
 
+	mutex_lock(&priv->io_lock);
+
 	ret = sx130x_field_write(priv, F_GLOBAL_EN, 1);
 	if (ret) {
 		dev_err(priv->dev, "enable global clocks failed\n");
-		return ret;
+		goto err_reg;
 	}
 
 	ret = sx130x_field_write(priv, F_CLK32M_EN, 1);
 	if (ret) {
 		dev_err(priv->dev, "enable 32M clock failed\n");
-		return ret;
+		goto err_reg;
 	}
 
 	/* calibration */
 
 	ret = sx130x_agc_calibrate(priv);
 	if (ret)
-		return ret;
+		goto err_calibrate;
 
 	/* TODO */
 
 	ret = sx130x_load_all_firmware(priv);
 	if (ret)
-		return ret;
+		goto err_firmware;
 
 	ret = open_loradev(netdev);
 	if (ret)
-		return ret;
+		goto err_open;
+
+	mutex_unlock(&priv->io_lock);
 
 	netif_start_queue(netdev);
 
 	return 0;
+
+err_open:
+err_firmware:
+err_calibrate:
+err_reg:
+	mutex_unlock(&priv->io_lock);
+	return ret;
 }
 
 static int sx130x_loradev_stop(struct net_device *netdev)
@@ -541,6 +571,8 @@ static int sx130x_probe(struct spi_device *spi)
 
 	priv = netdev_priv(netdev);
 	priv->rst_gpio = rst;
+
+	mutex_init(&priv->io_lock);
 
 	spi_set_drvdata(spi, netdev);
 	priv->dev = &spi->dev;
@@ -634,12 +666,14 @@ static int sx130x_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
+	mutex_lock(&priv->io_lock);
+
 	/* GPIO */
 
 	ret = regmap_read(priv->regmap, SX1301_GPMODE, &val);
 	if (ret) {
 		dev_err(&spi->dev, "GPIO mode read failed\n");
-		return ret;
+		goto out;
 	}
 
 	val |= GENMASK(4, 0);
@@ -647,13 +681,13 @@ static int sx130x_probe(struct spi_device *spi)
 	ret = regmap_write(priv->regmap, SX1301_GPMODE, val);
 	if (ret) {
 		dev_err(&spi->dev, "GPIO mode write failed\n");
-		return ret;
+		goto out;
 	}
 
 	ret = regmap_read(priv->regmap, SX1301_GPSO, &val);
 	if (ret) {
 		dev_err(&spi->dev, "GPIO select output read failed\n");
-		return ret;
+		goto out;
 	}
 
 	val &= ~GENMASK(3, 0);
@@ -662,18 +696,21 @@ static int sx130x_probe(struct spi_device *spi)
 	ret = regmap_write(priv->regmap, SX1301_GPSO, val);
 	if (ret) {
 		dev_err(&spi->dev, "GPIO select output write failed\n");
-		return ret;
+		goto out;
 	}
 
 	/* TODO LBT */
 
 	ret = register_loradev(netdev);
 	if (ret)
-		return ret;
+		goto out;
 
 	dev_info(&spi->dev, "SX1301 module probed\n");
 
-	return 0;
+out:
+	mutex_unlock(&priv->io_lock);
+
+	return ret;
 }
 
 static int sx130x_remove(struct spi_device *spi)
