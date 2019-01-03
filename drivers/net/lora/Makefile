@@ -36,6 +36,8 @@ lora-sx130x-y := sx130x.o
 lora-sx130x-y += sx130x_radio.o
 obj-$(CONFIG_LORA_SX130X) += lora-sx130x-picogw.o
 lora-sx130x-picogw-y := sx130x_picogw.o
+obj-$(CONFIG_LORA_SX130X) += lora-picogw.o
+lora-picogw-y := picogw.o
 
 obj-$(CONFIG_LORA_TING01M) += lora-ting01m.o
 lora-ting01m-y := ting01m.o
