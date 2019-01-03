@@ -1460,7 +1460,7 @@ skip_countries:
 	usb_set_intfdata(data_interface, acm);
 
 	usb_get_intf(control_interface);
-	tty_dev = tty_port_register_device(&acm->port, acm_tty_driver, minor,
+	tty_dev = tty_port_register_device_serdev(&acm->port, acm_tty_driver, minor,
 			&control_interface->dev);
 	if (IS_ERR(tty_dev)) {
 		rv = PTR_ERR(tty_dev);
@@ -1534,7 +1534,7 @@ static void acm_disconnect(struct usb_interface *intf)
 	acm_kill_urbs(acm);
 	cancel_work_sync(&acm->work);
 
-	tty_unregister_device(acm_tty_driver, acm->minor);
+	tty_port_unregister_device(&acm->port, acm_tty_driver, acm->minor);
 
 	usb_free_urb(acm->ctrlurb);
 	for (i = 0; i < ACM_NW; i++)
