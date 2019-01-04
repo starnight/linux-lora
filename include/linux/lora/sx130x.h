@@ -9,8 +9,15 @@
 #define LORA_SX130X_H
 
 #include <linux/device.h>
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
+
+extern const struct regmap_config sx130x_regmap_config;
+int sx130x_early_probe(struct regmap *regmap, struct gpio_desc *rst);
+int sx130x_probe(struct device *dev);
+int sx130x_remove(struct device *dev);
+
 
 struct sx130x_radio_device {
 	struct device dev;

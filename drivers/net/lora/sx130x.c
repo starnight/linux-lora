@@ -133,7 +133,7 @@ static bool sx130x_readable_noinc_reg(struct device *dev, unsigned int reg)
 	}
 }
 
-static struct regmap_config sx130x_regmap_config = {
+const struct regmap_config sx130x_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 
@@ -151,6 +151,7 @@ static struct regmap_config sx130x_regmap_config = {
 	.num_ranges = ARRAY_SIZE(sx130x_regmap_ranges),
 	.max_register = SX1301_MAX_REGISTER,
 };
+EXPORT_SYMBOL_GPL(sx130x_regmap_config);
 
 static int sx130x_field_write(struct sx130x_priv *priv,
 		enum sx130x_fields field_id, u8 val)
@@ -537,15 +538,188 @@ static const struct net_device_ops sx130x_net_device_ops = {
 	.ndo_start_xmit = sx130x_loradev_start_xmit,
 };
 
-static int sx130x_probe(struct spi_device *spi)
+int sx130x_early_probe(struct regmap *regmap, struct gpio_desc *rst)
 {
+	struct device *dev = regmap_get_device(regmap);
 	struct net_device *netdev;
 	struct sx130x_priv *priv;
-	struct gpio_desc *rst;
 	int ret;
 	int i;
+
+	netdev = devm_alloc_loradev(dev, sizeof(*priv));
+	if (!netdev)
+		return -ENOMEM;
+
+	netdev->netdev_ops = &sx130x_net_device_ops;
+	SET_NETDEV_DEV(netdev, dev);
+
+	priv = netdev_priv(netdev);
+	priv->regmap = regmap;
+	priv->rst_gpio = rst;
+
+	mutex_init(&priv->io_lock);
+
+	dev_set_drvdata(dev, netdev);
+	priv->dev = dev;
+
+	for (i = 0; i < ARRAY_SIZE(sx130x_regmap_fields); i++) {
+		const struct reg_field *reg_fields = sx130x_regmap_fields;
+
+		priv->regmap_fields[i] = devm_regmap_field_alloc(dev,
+				priv->regmap,
+				reg_fields[i]);
+		if (IS_ERR(priv->regmap_fields[i])) {
+			ret = PTR_ERR(priv->regmap_fields[i]);
+			dev_err(dev, "Cannot allocate regmap field (%d)\n", ret);
+			return ret;
+		}
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sx130x_early_probe);
+
+int sx130x_probe(struct device *dev)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct sx130x_priv *priv = netdev_priv(netdev);
 	unsigned int ver;
 	unsigned int val;
+	int ret;
+
+	ret = regmap_read(priv->regmap, SX1301_VER, &ver);
+	if (ret) {
+		dev_err(dev, "version read failed (%d)\n", ret);
+		return ret;
+	}
+
+	if (ver != SX1301_CHIP_VERSION) {
+		dev_err(dev, "unexpected version: %u\n", ver);
+		return -ENXIO;
+	}
+
+	ret = regmap_write(priv->regmap, SX1301_PAGE, 0);
+	if (ret) {
+		dev_err(dev, "page/reset write failed (%d)\n", ret);
+		return ret;
+	}
+
+	ret = sx130x_field_write(priv, F_SOFT_RESET, 1);
+	if (ret) {
+		dev_err(dev, "soft reset failed (%d)\n", ret);
+		return ret;
+	}
+
+	ret = sx130x_field_write(priv, F_GLOBAL_EN, 0);
+	if (ret) {
+		dev_err(dev, "gate global clocks failed (%d)\n", ret);
+		return ret;
+	}
+
+	ret = sx130x_field_write(priv, F_CLK32M_EN, 0);
+	if (ret) {
+		dev_err(dev, "gate 32M clock failed (%d)\n", ret);
+		return ret;
+	}
+
+	ret = sx130x_field_write(priv, F_RADIO_A_EN, 1);
+	if (ret) {
+		dev_err(dev, "radio A enable failed (%d)\n", ret);
+		return ret;
+	}
+
+	ret = sx130x_field_write(priv, F_RADIO_B_EN, 1);
+	if (ret) {
+		dev_err(dev, "radio B enable failed (%d)\n", ret);
+		return ret;
+	}
+
+	msleep(500);
+
+	ret = sx130x_field_write(priv, F_RADIO_RST, 1);
+	if (ret) {
+		dev_err(dev, "radio assert reset failed (%d)\n", ret);
+		return ret;
+	}
+
+	msleep(5);
+
+	ret = sx130x_field_write(priv, F_RADIO_RST, 0);
+	if (ret) {
+		dev_err(dev, "radio deassert reset failed (%d)\n", ret);
+		return ret;
+	}
+
+	/* radio */
+
+	ret = devm_sx130x_register_radio_devices(dev);
+	if (ret)
+		return ret;
+
+	mutex_lock(&priv->io_lock);
+
+	/* GPIO */
+
+	ret = regmap_read(priv->regmap, SX1301_GPMODE, &val);
+	if (ret) {
+		dev_err(dev, "GPIO mode read failed (%d)\n", ret);
+		goto out;
+	}
+
+	val |= GENMASK(4, 0);
+
+	ret = regmap_write(priv->regmap, SX1301_GPMODE, val);
+	if (ret) {
+		dev_err(dev, "GPIO mode write failed (%d)\n", ret);
+		goto out;
+	}
+
+	ret = regmap_read(priv->regmap, SX1301_GPSO, &val);
+	if (ret) {
+		dev_err(dev, "GPIO select output read failed (%d)\n", ret);
+		goto out;
+	}
+
+	val &= ~GENMASK(3, 0);
+	val |= 2;
+
+	ret = regmap_write(priv->regmap, SX1301_GPSO, val);
+	if (ret) {
+		dev_err(dev, "GPIO select output write failed (%d)\n", ret);
+		goto out;
+	}
+
+	/* TODO LBT */
+
+	ret = register_loradev(netdev);
+	if (ret)
+		goto out;
+
+	dev_info(dev, "SX1301 module probed\n");
+
+out:
+	mutex_unlock(&priv->io_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sx130x_probe);
+
+int sx130x_remove(struct device *dev)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+
+	unregister_loradev(netdev);
+
+	dev_info(dev, "SX1301 module removed\n");
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sx130x_remove);
+
+static int sx130x_spi_probe(struct spi_device *spi)
+{
+	struct gpio_desc *rst;
+	struct regmap *regmap;
+	int ret;
 
 	rst = devm_gpiod_get_optional(&spi->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(rst)) {
@@ -562,166 +736,23 @@ static int sx130x_probe(struct spi_device *spi)
 	spi->bits_per_word = 8;
 	spi_setup(spi);
 
-	netdev = devm_alloc_loradev(&spi->dev, sizeof(*priv));
-	if (!netdev)
-		return -ENOMEM;
-
-	netdev->netdev_ops = &sx130x_net_device_ops;
-	SET_NETDEV_DEV(netdev, &spi->dev);
-
-	priv = netdev_priv(netdev);
-	priv->rst_gpio = rst;
-
-	mutex_init(&priv->io_lock);
-
-	spi_set_drvdata(spi, netdev);
-	priv->dev = &spi->dev;
-
-	priv->regmap = devm_regmap_init_spi(spi, &sx130x_regmap_config);
-	if (IS_ERR(priv->regmap)) {
-		ret = PTR_ERR(priv->regmap);
+	regmap = devm_regmap_init_spi(spi, &sx130x_regmap_config);
+	if (IS_ERR(regmap)) {
+		ret = PTR_ERR(regmap);
 		dev_err(&spi->dev, "Regmap allocation failed: %d\n", ret);
 		return ret;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(sx130x_regmap_fields); i++) {
-		const struct reg_field *reg_fields = sx130x_regmap_fields;
-
-		priv->regmap_fields[i] = devm_regmap_field_alloc(&spi->dev,
-				priv->regmap,
-				reg_fields[i]);
-		if (IS_ERR(priv->regmap_fields[i])) {
-			ret = PTR_ERR(priv->regmap_fields[i]);
-			dev_err(&spi->dev, "Cannot allocate regmap field: %d\n", ret);
-			return ret;
-		}
-	}
-
-	ret = regmap_read(priv->regmap, SX1301_VER, &ver);
-	if (ret) {
-		dev_err(&spi->dev, "version read failed\n");
-		return ret;
-	}
-
-	if (ver != SX1301_CHIP_VERSION) {
-		dev_err(&spi->dev, "unexpected version: %u\n", ver);
-		return -ENXIO;
-	}
-
-	ret = regmap_write(priv->regmap, SX1301_PAGE, 0);
-	if (ret) {
-		dev_err(&spi->dev, "page/reset write failed\n");
-		return ret;
-	}
-
-	ret = sx130x_field_write(priv, F_SOFT_RESET, 1);
-	if (ret) {
-		dev_err(&spi->dev, "soft reset failed\n");
-		return ret;
-	}
-
-	ret = sx130x_field_write(priv, F_GLOBAL_EN, 0);
-	if (ret) {
-		dev_err(&spi->dev, "gate global clocks failed\n");
-		return ret;
-	}
-
-	ret = sx130x_field_write(priv, F_CLK32M_EN, 0);
-	if (ret) {
-		dev_err(&spi->dev, "gate 32M clock failed\n");
-		return ret;
-	}
-
-	ret = sx130x_field_write(priv, F_RADIO_A_EN, 1);
-	if (ret) {
-		dev_err(&spi->dev, "radio a enable failed\n");
-		return ret;
-	}
-
-	ret = sx130x_field_write(priv, F_RADIO_B_EN, 1);
-	if (ret) {
-		dev_err(&spi->dev, "radio b enable failed\n");
-		return ret;
-	}
-
-	msleep(500);
-
-	ret = sx130x_field_write(priv, F_RADIO_RST, 1);
-	if (ret) {
-		dev_err(&spi->dev, "radio asert reset failed\n");
-		return ret;
-	}
-
-	msleep(5);
-
-	ret = sx130x_field_write(priv, F_RADIO_RST, 0);
-	if (ret) {
-		dev_err(&spi->dev, "radio deasert reset failed\n");
-		return ret;
-	}
-
-	/* radio */
-
-	ret = devm_sx130x_register_radio_devices(&spi->dev);
+	ret = sx130x_early_probe(regmap, rst);
 	if (ret)
 		return ret;
 
-	mutex_lock(&priv->io_lock);
-
-	/* GPIO */
-
-	ret = regmap_read(priv->regmap, SX1301_GPMODE, &val);
-	if (ret) {
-		dev_err(&spi->dev, "GPIO mode read failed\n");
-		goto out;
-	}
-
-	val |= GENMASK(4, 0);
-
-	ret = regmap_write(priv->regmap, SX1301_GPMODE, val);
-	if (ret) {
-		dev_err(&spi->dev, "GPIO mode write failed\n");
-		goto out;
-	}
-
-	ret = regmap_read(priv->regmap, SX1301_GPSO, &val);
-	if (ret) {
-		dev_err(&spi->dev, "GPIO select output read failed\n");
-		goto out;
-	}
-
-	val &= ~GENMASK(3, 0);
-	val |= 2;
-
-	ret = regmap_write(priv->regmap, SX1301_GPSO, val);
-	if (ret) {
-		dev_err(&spi->dev, "GPIO select output write failed\n");
-		goto out;
-	}
-
-	/* TODO LBT */
-
-	ret = register_loradev(netdev);
-	if (ret)
-		goto out;
-
-	dev_info(&spi->dev, "SX1301 module probed\n");
-
-out:
-	mutex_unlock(&priv->io_lock);
-
-	return ret;
+	return sx130x_probe(&spi->dev);
 }
 
-static int sx130x_remove(struct spi_device *spi)
+static int sx130x_spi_remove(struct spi_device *spi)
 {
-	struct net_device *netdev = spi_get_drvdata(spi);
-
-	unregister_loradev(netdev);
-
-	dev_info(&spi->dev, "SX1301 module removed\n");
-
-	return 0;
+	return sx130x_remove(&spi->dev);;
 }
 
 #ifdef CONFIG_OF
@@ -737,8 +768,8 @@ static struct spi_driver sx130x_spi_driver = {
 		.name = "sx130x",
 		.of_match_table = of_match_ptr(sx130x_dt_ids),
 	},
-	.probe = sx130x_probe,
-	.remove = sx130x_remove,
+	.probe = sx130x_spi_probe,
+	.remove = sx130x_spi_remove,
 };
 
 static int __init sx130x_init(void)
