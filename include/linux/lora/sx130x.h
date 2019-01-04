@@ -14,6 +14,8 @@
 #include <linux/regmap.h>
 
 extern const struct regmap_config sx130x_regmap_config;
+void sx130x_set_drvdata(struct device *dev, void *drvdata);
+void *sx130x_get_drvdata(struct device *dev);
 int sx130x_early_probe(struct regmap *regmap, struct gpio_desc *rst);
 int sx130x_probe(struct device *dev);
 int sx130x_remove(struct device *dev);

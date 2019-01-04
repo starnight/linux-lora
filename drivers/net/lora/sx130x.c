@@ -60,6 +60,7 @@ struct sx130x_priv {
 	struct regmap		*regmap;
 	struct regmap_field	*regmap_fields[ARRAY_SIZE(sx130x_regmap_fields)];
 	struct mutex		io_lock;
+	void			*drvdata;
 };
 
 struct regmap *sx130x_get_regmap(struct device *dev)
@@ -69,6 +70,24 @@ struct regmap *sx130x_get_regmap(struct device *dev)
 
 	return priv->regmap;
 }
+
+void sx130x_set_drvdata(struct device *dev, void *drvdata)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct sx130x_priv *priv = netdev_priv(netdev);
+
+	priv->drvdata = drvdata;
+}
+EXPORT_SYMBOL_GPL(sx130x_set_drvdata);
+
+void *sx130x_get_drvdata(struct device *dev)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct sx130x_priv *priv = netdev_priv(netdev);
+
+	return priv->drvdata;
+}
+EXPORT_SYMBOL_GPL(sx130x_get_drvdata);
 
 void sx130x_io_lock(struct device *dev)
 {
