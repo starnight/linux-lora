@@ -353,7 +353,7 @@ static int sx130x_agc_calibrate(struct sx130x_priv *priv)
 	if (val != SX1301_MCU_AGC_CAL_FW_VERSION) {
 		dev_err(priv->dev, "unexpected firmware version, expecting %u\n",
 				SX1301_MCU_AGC_CAL_FW_VERSION);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	ret = sx130x_field_write(priv, F_EMERGENCY_FORCE_HOST_CTRL, 0);
@@ -380,7 +380,7 @@ static int sx130x_agc_calibrate(struct sx130x_priv *priv)
 	dev_info(priv->dev, "AGC status: %02x\n", (unsigned)val);
 	if ((val & (BIT(7) | BIT(0))) != (BIT(7) | BIT(0))) {
 		dev_err(priv->dev, "AGC calibration failed\n");
-		return -ENXIO;
+		return -EIO;
 	}
 
 	return 0;
@@ -453,7 +453,7 @@ static int sx130x_load_all_firmware(struct sx130x_priv *priv)
 	if (val != SX1301_MCU_AGC_FW_VERSION) {
 		dev_err(priv->dev, "unexpected firmware version, expecting %u\n",
 				SX1301_MCU_AGC_FW_VERSION);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	ret = sx130x_arb_ram_read(priv, 0x20, &val);
@@ -467,7 +467,7 @@ static int sx130x_load_all_firmware(struct sx130x_priv *priv)
 	if (val != SX1301_MCU_ARB_FW_VERSION) {
 		dev_err(priv->dev, "unexpected firmware version, expecting %u\n",
 				SX1301_MCU_ARB_FW_VERSION);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	return 0;
@@ -636,7 +636,7 @@ int sx130x_probe(struct device *dev)
 
 	if (ver != SX1301_CHIP_VERSION) {
 		dev_err(dev, "unexpected version: %u\n", ver);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	ret = regmap_write(priv->regmap, SX1301_PAGE, 0);
