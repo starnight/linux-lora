@@ -121,6 +121,8 @@ static int picogw_reg_read(struct picogw_device *picodev, u8 addr, u8 *val, unsi
 	if (!ack || ret != 1)
 		return -EIO;
 
+	dev_dbg(&picodev->serdev->dev, "r %02x == %02x\n", (unsigned int)addr, (unsigned int)*val);
+
 	return 0;
 }
 
@@ -141,6 +143,8 @@ static int picogw_reg_write(struct picogw_device *picodev, u8 addr, u8 val, unsi
 		return -EIO;
 	if (!ack || ret != 0)
 		return -EIO;
+
+	dev_dbg(&picodev->serdev->dev, "w %02x -> %02x\n", (unsigned int)addr, (unsigned int)val);
 
 	return 0;
 }
