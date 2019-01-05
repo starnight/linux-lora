@@ -46,18 +46,19 @@ static int picogw_send_cmd(struct picogw_device *picodev, char cmd,
 {
 	struct serdev_device *sdev = picodev->serdev;
 	u8 buf[4];
-	int i, ret;
+	int ret;
+	//int i;
 
 	buf[0] = cmd;
 	buf[1] = (data_len >> 8) & 0xff;
 	buf[2] = (data_len >> 0) & 0xff;
 	buf[3] = addr;
 
-	dev_dbg(&sdev->dev, "%s: %c %02x %02x %02x\n", __func__, buf[0],
+	/*dev_dbg(&sdev->dev, "%s: %c %02x %02x %02x\n", __func__, buf[0],
 		(unsigned int)buf[1], (unsigned int)buf[2], (unsigned int)buf[3]);
 	for (i = 0; i < data_len; i++) {
 		dev_dbg(&sdev->dev, "%s: data %02x\n", __func__, (unsigned int)((const u8*)data)[i]);
-	}
+	}*/
 
 	ret = serdev_device_write_buf(sdev, buf, 4);
 	if (ret < 0)
@@ -250,7 +251,8 @@ static int picogw_handle_answer(struct picogw_device *picodev)
 	struct device *dev = &picodev->serdev->dev;
 	unsigned int data_len = ((u16)picodev->rx_buf[1] << 8) | picodev->rx_buf[2];
 	int cmd_len = 4 + data_len;
-	int i, ret;
+	int ret;
+	//int i;
 
 	if (picodev->rx_len < 4)
 		return 0;
@@ -265,13 +267,13 @@ static int picogw_handle_answer(struct picogw_device *picodev)
 		return 0;
 	}
 
-	dev_dbg(dev, "Answer %c =%u %s (%u)\n", picodev->rx_buf[0],
+	/*dev_dbg(dev, "%s: Answer %c =%u %s (%u)\n", __func__, picodev->rx_buf[0],
 		(unsigned int)picodev->rx_buf[3],
 		(picodev->rx_buf[3] == 1) ? "OK" : "K0",
 		data_len);
 	for (i = 0; i < data_len; i++) {
-		//dev_dbg(dev, "%s: %02x\n", __func__, (unsigned int)picodev->rx_buf[4 + i]);
-	}
+		dev_dbg(dev, "%s: %02x\n", __func__, (unsigned int)picodev->rx_buf[4 + i]);
+	}*/
 
 	complete(&picodev->answer_comp);
 	ret = wait_for_completion_interruptible_timeout(&picodev->answer_read_comp, HZ / 2);
@@ -289,7 +291,7 @@ static int picogw_receive_buf(struct serdev_device *sdev, const u8 *data, size_t
 	size_t i;
 	int len = 0;
 
-	dev_dbg(&sdev->dev, "Receive (%zu)\n", count);
+	//dev_dbg(&sdev->dev, "Receive (%zu)\n", count);
 
 	if (completion_done(&picodev->answer_comp)) {
 		dev_info(&sdev->dev, "RX waiting on completion\n");
