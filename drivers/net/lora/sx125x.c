@@ -195,8 +195,12 @@ static int __maybe_unused sx125x_regmap_probe(struct device *dev, struct regmap 
 	if (true) {
 		ret = regmap_read(priv->regmap, SX1255_VERSION, &val);
 		if (ret) {
-			dev_err(dev, "version read failed\n");
+			dev_err(dev, "version read failed (%d)\n", ret);
 			return ret;
+		}
+		if (val != 0x21) {
+			dev_err(dev, "unexpected version: %u\n", val);
+			return -EINVAL;
 		}
 		dev_info(dev, "SX125x version: %02x\n", val);
 	}
