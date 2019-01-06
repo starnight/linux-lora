@@ -182,7 +182,19 @@ static int sx130x_field_write(struct sx130x_priv *priv,
 
 static int sx130x_soft_reset(struct sx130x_priv *priv)
 {
-	return sx130x_field_write(priv, F_SOFT_RESET, 1);
+	int ret;
+
+	regcache_cache_bypass(priv->regmap, true);
+	ret = sx130x_field_write(priv, F_SOFT_RESET, 1);
+	regcache_cache_bypass(priv->regmap, false);
+	if (ret)
+		return ret;
+
+	regcache_mark_dirty(priv->regmap);
+	if (sx130x_regmap_config.cache_type != REGCACHE_NONE)
+		return regcache_drop_region(priv->regmap,
+			0, sx130x_regmap_config.max_register);
+	return 0;
 }
 
 static int sx130x_agc_ram_read(struct sx130x_priv *priv, u8 addr, unsigned int *val)
