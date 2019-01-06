@@ -343,7 +343,7 @@ static int sx130x_agc_calibrate(struct sx130x_priv *priv)
 		return ret;
 	}
 
-	ret = sx130x_field_write(priv, F_FORCE_HOST_RADIO_CTRL, 0);
+	ret = sx130x_field_force_write(priv, F_FORCE_HOST_RADIO_CTRL, 0);
 	if (ret) {
 		dev_err(priv->dev, "force host control failed\n");
 		return ret;
