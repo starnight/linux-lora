@@ -315,7 +315,7 @@ static int sx130x_load_firmware(struct sx130x_priv *priv, int mcu, const struct 
 
 	kfree(buf);
 
-	ret = sx130x_field_write(priv, select_mux, 1);
+	ret = sx130x_field_force_write(priv, select_mux, 1);
 	if (ret) {
 		dev_err(priv->dev, "MCU RAM release mux failed\n");
 		return ret;
@@ -359,7 +359,7 @@ static int sx130x_agc_calibrate(struct sx130x_priv *priv)
 		return ret;
 	}
 
-	ret = sx130x_field_write(priv, F_MCU_RST_1, 0);
+	ret = sx130x_field_force_write(priv, F_MCU_RST_1, 0);
 	if (ret) {
 		dev_err(priv->dev, "MCU 1 reset failed\n");
 		return ret;
@@ -459,7 +459,7 @@ static int sx130x_load_all_firmware(struct sx130x_priv *priv)
 		return ret;
 	}
 
-	ret = sx130x_field_write(priv, F_MCU_RST_1, 0);
+	ret = sx130x_field_force_write(priv, F_MCU_RST_1, 0);
 	if (ret) {
 		dev_err(priv->dev, "MCU 1 release failed\n");
 		return ret;
@@ -542,7 +542,7 @@ static int sx130x_loradev_open(struct net_device *netdev)
 		goto err_reg;
 	}
 
-	ret = sx130x_field_write(priv, F_CLK32M_EN, 1);
+	ret = sx130x_field_force_write(priv, F_CLK32M_EN, 1);
 	if (ret) {
 		dev_err(priv->dev, "enable 32M clock failed (%d)\n", ret);
 		goto err_reg;
@@ -708,7 +708,7 @@ int sx130x_probe(struct device *dev)
 
 	msleep(5);
 
-	ret = sx130x_field_write(priv, F_RADIO_RST, 0);
+	ret = sx130x_field_force_write(priv, F_RADIO_RST, 0);
 	if (ret) {
 		dev_err(dev, "radio deassert reset failed (%d)\n", ret);
 		return ret;
