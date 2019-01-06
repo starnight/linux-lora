@@ -162,7 +162,7 @@ const struct regmap_config sx130x_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 
-	.cache_type = REGCACHE_NONE,
+	.cache_type = REGCACHE_RBTREE,
 	.disable_locking = true,
 
 	.read_flag_mask = 0,
