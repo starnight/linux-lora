@@ -180,6 +180,11 @@ static int sx130x_field_write(struct sx130x_priv *priv,
 	return regmap_field_write(priv->regmap_fields[field_id], val);
 }
 
+static int sx130x_soft_reset(struct sx130x_priv *priv)
+{
+	return sx130x_field_write(priv, F_SOFT_RESET, 1);
+}
+
 static int sx130x_agc_ram_read(struct sx130x_priv *priv, u8 addr, unsigned int *val)
 {
 	int ret;
@@ -645,7 +650,7 @@ int sx130x_probe(struct device *dev)
 		return ret;
 	}
 
-	ret = sx130x_field_write(priv, F_SOFT_RESET, 1);
+	ret = sx130x_soft_reset(priv);
 	if (ret) {
 		dev_err(dev, "soft reset failed (%d)\n", ret);
 		return ret;
