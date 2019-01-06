@@ -174,10 +174,16 @@ const struct regmap_config sx130x_regmap_config = {
 };
 EXPORT_SYMBOL_GPL(sx130x_regmap_config);
 
-static int sx130x_field_write(struct sx130x_priv *priv,
+static inline int sx130x_field_write(struct sx130x_priv *priv,
 		enum sx130x_fields field_id, u8 val)
 {
 	return regmap_field_write(priv->regmap_fields[field_id], val);
+}
+
+static inline int sx130x_field_force_write(struct sx130x_priv *priv,
+		enum sx130x_fields field_id, u8 val)
+{
+	return regmap_field_force_write(priv->regmap_fields[field_id], val);
 }
 
 static int sx130x_soft_reset(struct sx130x_priv *priv)
@@ -373,7 +379,7 @@ static int sx130x_agc_calibrate(struct sx130x_priv *priv)
 		return -EIO;
 	}
 
-	ret = sx130x_field_write(priv, F_EMERGENCY_FORCE_HOST_CTRL, 0);
+	ret = sx130x_field_force_write(priv, F_EMERGENCY_FORCE_HOST_CTRL, 0);
 	if (ret) {
 		dev_err(priv->dev, "emergency force failed\n");
 		return ret;
@@ -694,7 +700,7 @@ int sx130x_probe(struct device *dev)
 
 	msleep(500);
 
-	ret = sx130x_field_write(priv, F_RADIO_RST, 1);
+	ret = sx130x_field_force_write(priv, F_RADIO_RST, 1);
 	if (ret) {
 		dev_err(dev, "radio assert reset failed (%d)\n", ret);
 		return ret;
