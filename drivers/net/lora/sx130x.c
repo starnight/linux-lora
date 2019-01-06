@@ -692,7 +692,7 @@ int sx130x_probe(struct device *dev)
 		return ret;
 	}
 
-	ret = sx130x_field_write(priv, F_RADIO_B_EN, 1);
+	ret = sx130x_field_force_write(priv, F_RADIO_B_EN, 1);
 	if (ret) {
 		dev_err(dev, "radio B enable failed (%d)\n", ret);
 		return ret;
