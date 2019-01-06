@@ -126,6 +126,8 @@ static bool sx130x_volatile_reg(struct device *dev, unsigned int reg)
 	case SX1301_MPD:
 	case SX1301_AGCSTS:
 
+	case SX1301_MCU_CTRL:
+
 	case SX1301_RADIO_A_SPI_DATA_RB:
 	case SX1301_RADIO_B_SPI_DATA_RB:
 	case SX1301_DBG_ARB_MCU_RAM_DATA:
