@@ -116,14 +116,6 @@ dgram_bind_end:
 }
 
 static int
-lrw_dev_hard_header(struct sk_buff *skb, struct net_device *ndev,
-		    const u32 src_devaddr, size_t len)
-{
-	/* TODO: Prepare the LoRaWAN sending header here */
-	return 0;
-}
-
-static int
 dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 {
 	struct dgram_sock *ro = dgram_sk(sk);
@@ -175,10 +167,6 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 
 	skb_reserve(skb, hlen);
 	skb_reset_network_header(skb);
-
-	ret = lrw_dev_hard_header(skb, ndev, 0, size);
-	if (ret < 0)
-		goto dgram_sendmsg_no_skb;
 
 	ret = memcpy_from_msg(skb_put(skb, size), msg, size);
 	if (ret > 0)
