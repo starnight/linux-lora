@@ -51,8 +51,10 @@ lrw_get_dev_by_addr(struct net *net, u32 devaddr)
 
 	rcu_read_lock();
 	ndev = dev_getbyhwaddr_rcu(net, ARPHRD_LORAWAN, (char *)&be_addr);
-	if (ndev)
+	if (ndev && ndev->type == ARPHRD_LORAWAN)
 		dev_hold(ndev);
+	else
+		ndev = NULL;
 	rcu_read_unlock();
 
 	return ndev;
@@ -98,11 +100,6 @@ dgram_bind(struct sock *sk, struct sockaddr *uaddr, int len)
 		goto dgram_bind_end;
 	}
 	netdev_dbg(ndev, "%s: get ndev\n", __func__);
-
-	if (ndev->type != ARPHRD_LORAWAN) {
-		ret = -ENODEV;
-		goto dgram_bind_end;
-	}
 
 	ro->src_devaddr = addr->addr_in.devaddr;
 	ro->bound = 1;
@@ -152,7 +149,7 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	if (size > ndev->mtu) {
 		netdev_dbg(ndev, "size = %zu, mtu = %u\n", size, ndev->mtu);
 		ret = -EMSGSIZE;
-		goto dgram_sendmsg_end;
+		goto dgram_sendmsg_no_skb;
 	}
 
 	netdev_dbg(ndev, "%s: create skb\n", __func__);
@@ -189,7 +186,6 @@ dgram_sendmsg_err_skb:
 	kfree_skb(skb);
 dgram_sendmsg_no_skb:
 	dev_put(ndev);
-
 dgram_sendmsg_end:
 	return ret;
 }
