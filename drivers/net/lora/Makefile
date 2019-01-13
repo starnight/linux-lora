@@ -9,6 +9,9 @@ lora-dev-y := dev.o
 # Alphabetically sorted.
 #
 
+obj-$(CONFIG_LORA_MIPOT_32001353) += lora-mipot32001353.o
+lora-mipot32001353-y := mipot32001353.o
+
 obj-$(CONFIG_LORA_MM002) += lora-mm002.o
 lora-mm002-y := mm002.o
 

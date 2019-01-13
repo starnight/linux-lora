@@ -17,6 +17,13 @@ config LORA_DEV
 
 if LORA_DEV
 
+config LORA_MIPOT_32001353
+	tristate "Mipot 32001353 driver"
+	default y
+	depends on SERIAL_DEV_BUS
+	help
+	  Mipot 32001353 LoRaWAN module
+
 config LORA_MM002
 	tristate "Nemeus MM002 driver"
 	default y
