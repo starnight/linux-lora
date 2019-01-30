@@ -12,6 +12,7 @@
 #include <linux/if_arp.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/lora/lorawan/skb.h>
 #include <linux/lora/lorawan_netdev.h>
 #include <linux/module.h>
 #include <linux/net.h>
