@@ -28,24 +28,4 @@ struct sockaddr_lorawan {
 	struct lrw_addr_in addr_in;
 };
 
-/**
- * lrw_mac_cb - This structure holds the control buffer (cb) of sk_buff
- *
- * @devaddr:	the LoRaWAN device address of this LoRaWAN hardware
- */
-struct lrw_mac_cb {
-	u32 devaddr;
-};
-
-/**
- * lrw_get_mac_cb - Get the LoRaWAN MAC control buffer of the sk_buff
- * @skb:	the exchanging sk_buff
- *
- * Return:	the pointer of LoRaWAN MAC control buffer
- */
-static inline struct lrw_mac_cb *lrw_get_mac_cb(struct sk_buff *skb)
-{
-	return (struct lrw_mac_cb *)skb->cb;
-}
-
 #endif
