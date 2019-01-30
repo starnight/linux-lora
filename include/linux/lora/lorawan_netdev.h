@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause */
-/*-
+/*
  * LoRaWAN stack related definitions
  *
- * Copyright (c) 2018 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
- *
+ * Copyright (c) 2018 Jian-Hong Pan <starnight@g.ncu.edu.tw>
  */
 
 #ifndef __LORAWAN_NET_DEVICE_H__

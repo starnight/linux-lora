@@ -1,36 +1,33 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause
-/*-
+/*
  * LoRaWAN stack related definitions
  *
- * Copyright (c) 2018 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
- *
+ * Copyright (c) 2018 Jian-Hong Pan <starnight@g.ncu.edu.tw>
  */
 
 #define	LORAWAN_MODULE_NAME	"lorawan"
 
 #define	pr_fmt(fmt)		LORAWAN_MODULE_NAME ": " fmt
 
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/list.h>
-#include <linux/net.h>
 #include <linux/if_arp.h>
+#include <linux/init.h>
+#include <linux/list.h>
+#include <linux/lora/lorawan_netdev.h>
+#include <linux/module.h>
+#include <linux/net.h>
 #include <linux/termios.h>		/* For TIOCOUTQ/INQ */
 #include <net/sock.h>
-#include <linux/lora/lorawan_netdev.h>
 
 /**
  * dgram_sock - This structure holds the states of Datagram socket
  *
  * @sk:			network layer representation of the socket
- *			sk must be the first member of dgram_sock
  * @src_devaddr:	the LoRaWAN device address for this connection
  * @bound:		this socket is bound or not
  * @connected:		this socket is connected to the destination or not
- * @want_ack:		this socket needs to ack for the connection or not
  */
 struct dgram_sock {
-	struct sock sk;
+	struct sock sk;	/* sk must be the first member of dgram_sock */
 	u32 src_devaddr;
 
 	u8 bound:1;
@@ -136,7 +133,7 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	size_t tlen;
 	int ret;
 
-	pr_debug("%s: going to send %zu bytes", __func__, size);
+	pr_debug("%s: going to send %zu bytes\n", __func__, size);
 	if (msg->msg_flags & MSG_OOB) {
 		pr_debug("msg->msg_flags = 0x%x\n", msg->msg_flags);
 		return -EOPNOTSUPP;
@@ -532,7 +529,7 @@ static const struct proto_ops lrw_dgram_ops = {
 };
 
 static int
-lorawan_creat(struct net *net, struct socket *sock, int protocol, int kern)
+lrw_create(struct net *net, struct socket *sock, int protocol, int kern)
 {
 	struct sock *sk;
 	int ret;
@@ -557,7 +554,7 @@ lorawan_creat(struct net *net, struct socket *sock, int protocol, int kern)
 		ret = sk->sk_prot->hash(sk);
 		if (ret) {
 			sk_common_release(sk);
-			goto lorawan_creat_end;
+			goto lrw_create_end;
 		}
 	}
 
@@ -567,14 +564,14 @@ lorawan_creat(struct net *net, struct socket *sock, int protocol, int kern)
 			sk_common_release(sk);
 	}
 
-lorawan_creat_end:
+lrw_create_end:
 	return ret;
 }
 
 static const struct net_proto_family lorawan_family_ops = {
 	.owner		= THIS_MODULE,
 	.family		= PF_LORAWAN,
-	.create		= lorawan_creat,
+	.create		= lrw_create,
 };
 
 static int
@@ -617,29 +614,29 @@ lrw_dgram_deliver_err:
 }
 
 static int
-lorawan_rcv(struct sk_buff *skb, struct net_device *ndev,
-	    struct packet_type *pt, struct net_device *orig_ndev)
+lrw_rcv(struct sk_buff *skb, struct net_device *ndev,
+	struct packet_type *pt, struct net_device *orig_ndev)
 {
 	if (!netif_running(ndev))
-		goto lorawan_rcv_drop;
+		goto lrw_rcv_drop;
 
 	if (!net_eq(dev_net(ndev), &init_net))
-		goto lorawan_rcv_drop;
+		goto lrw_rcv_drop;
 
 	if (ndev->type != ARPHRD_LORAWAN)
-		goto lorawan_rcv_drop;
+		goto lrw_rcv_drop;
 
 	if (skb->pkt_type != PACKET_OTHERHOST)
 		return lrw_dgram_deliver(ndev, skb);
 
-lorawan_rcv_drop:
+lrw_rcv_drop:
 	kfree_skb(skb);
 	return NET_RX_DROP;
 }
 
 static struct packet_type lorawan_packet_type = {
 	.type		= htons(ETH_P_LORAWAN),
-	.func		= lorawan_rcv,
+	.func		= lrw_rcv,
 };
 
 static int __init
@@ -665,7 +662,7 @@ lrw_sock_init_err:
 	proto_unregister(&lrw_dgram_prot);
 
 lrw_sock_init_end:
-	return 0;
+	return ret;
 }
 
 static void __exit
@@ -680,7 +677,7 @@ lrw_sock_exit(void)
 module_init(lrw_sock_init);
 module_exit(lrw_sock_exit);
 
-MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
-MODULE_DESCRIPTION("LoRaWAN socket kernel module");
+MODULE_AUTHOR("Jian-Hong Pan <starnight@g.ncu.edu.tw>");
+MODULE_DESCRIPTION("LoRaWAN socket protocol");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_ALIAS_NETPROTO(PF_LORAWAN);
